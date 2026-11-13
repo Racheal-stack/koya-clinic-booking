@@ -12,6 +12,22 @@ DATABASE_URL = os.getenv(
     "sqlite:///./clinic.db"
 )
 
+# Neon normally provides a standard PostgreSQL URL. Explicitly select the
+# psycopg 3 SQLAlchemy driver so the same value works in Render without
+# requiring the older psycopg2 package.
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace(
+        "postgresql://",
+        "postgresql+psycopg://",
+        1
+    )
+elif DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace(
+        "postgres://",
+        "postgresql+psycopg://",
+        1
+    )
+
 connect_args = (
     {"check_same_thread": False}
     if DATABASE_URL.startswith("sqlite")

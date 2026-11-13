@@ -589,7 +589,7 @@ def cancel_booking(
 # and integrations that send X-API-Key.
 # --------------------------------------------------
 
-@app.get("/web/slots")
+@app.get("/web/slots", include_in_schema=False)
 def web_list_slots(
     provider: str | None = None,
     db: Session = Depends(get_db)
@@ -597,7 +597,7 @@ def web_list_slots(
     return list_slots(provider=provider, db=db)
 
 
-@app.post("/web/bookings", status_code=201)
+@app.post("/web/bookings", status_code=201, include_in_schema=False)
 async def web_create_booking(
     request: Request,
     db: Session = Depends(get_db)
