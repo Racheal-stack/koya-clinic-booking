@@ -1,0 +1,387 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Koya Clinic | Book an Appointment</title>
+  <style>
+    :root {
+      --primary: #087f75;
+      --dark: #143c42;
+      --muted: #61777c;
+      --bg: #f4f9f8;
+      --border: #dce9e7;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--dark);
+      font-family: -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    header {
+      background: white;
+      border-bottom: 1px solid var(--border);
+      padding: 22px 7%;
+      font-weight: 800;
+      font-size: 22px;
+    }
+
+    header span { color: var(--primary); }
+
+    main {
+      max-width: 1050px;
+      margin: 48px auto;
+      padding: 0 20px;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .hero h1 {
+      font-size: clamp(30px, 5vw, 44px);
+      margin: 0 0 12px;
+    }
+
+    .hero p {
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .panel {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 25px;
+      box-shadow: 0 10px 35px rgba(20,60,66,.04);
+    }
+
+    h2 { font-size: 21px; margin-top: 0; }
+
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 650;
+      margin: 16px 0 7px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 13px;
+      border: 1px solid #cddfdd;
+      border-radius: 9px;
+      font: inherit;
+      background: white;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 18px;
+      background: var(--primary);
+      color: white;
+      border: 0;
+      border-radius: 9px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover { background: #056b63; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+
+    .slot {
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      margin: 12px 0;
+      cursor: pointer;
+    }
+
+    .slot.selected {
+      border: 2px solid var(--primary);
+      background: #effaf8;
+    }
+
+    .slot.unavailable {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .slot strong { display: block; margin-bottom: 6px; }
+
+    .slot small { color: var(--muted); }
+
+    .status {
+      margin-top: 15px;
+      padding: 12px;
+      border-radius: 9px;
+      background: #effaf8;
+      color: #075d55;
+      overflow-wrap: anywhere;
+    }
+
+    .status.error {
+      background: #fff0f0;
+      color: #a42323;
+    }
+
+    .hint {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .hidden { display: none; }
+
+    @media (max-width: 750px) {
+      .layout { grid-template-columns: 1fr; }
+      main { margin-top: 30px; }
+    }
+  </style>
+</head>
+<body>
+  <header>Koya <span>Clinic</span></header>
+
+  <main>
+    <section class="hero">
+      <h1>Healthcare made simple.</h1>
+      <p>
+        Find an available appointment and book your visit
+        in just a few steps.
+      </p>
+    </section>
+
+    <div class="layout">
+      <section class="panel">
+        <h2>Find an appointment</h2>
+
+        <p class="hint">
+          Choose a convenient appointment time, then enter your details to
+          confirm your visit.
+        </p>
+
+        <button id="loadBtn" type="button">
+          Load available appointments
+        </button>
+
+        <div id="slots"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Book your appointment</h2>
+
+        <form id="bookingForm">
+          <label for="selectedSlot">Selected appointment</label>
+          <input
+            id="selectedSlot"
+            placeholder="Choose an appointment on the left"
+            readonly
+            required
+          >
+
+          <label for="patientName">Full name</label>
+          <input
+            id="patientName"
+            placeholder="Enter your full name"
+            required
+          >
+
+          <label for="patientEmail">Email address</label>
+          <input
+            id="patientEmail"
+            type="email"
+            placeholder="you@example.com"
+            required
+          >
+
+          <button id="bookBtn" type="submit">
+            Confirm booking
+          </button>
+        </form>
+
+        <div id="message" class="status hidden" role="status"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const slotsContainer = document.getElementById("slots");
+    const selectedSlotInput = document.getElementById("selectedSlot");
+    const form = document.getElementById("bookingForm");
+    const message = document.getElementById("message");
+    const loadBtn = document.getElementById("loadBtn");
+    const bookBtn = document.getElementById("bookBtn");
+
+    let selectedSlot = null;
+
+    function showMessage(text, isError = false) {
+      message.textContent = text;
+      message.className = isError
+        ? "status error"
+        : "status";
+    }
+
+    async function apiRequest(path, options = {}) {
+      const response = await fetch(path, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(options.headers || {})
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Request failed. Please try again."
+        );
+      }
+
+      return data;
+    }
+
+    function formatDate(date) {
+      return new Date(date).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short"
+      });
+    }
+
+    async function loadSlots() {
+      loadBtn.disabled = true;
+      slotsContainer.textContent = "Loading appointments...";
+      selectedSlot = null;
+      selectedSlotInput.value = "";
+
+      try {
+        const data = await apiRequest("/web/slots");
+        slotsContainer.replaceChildren();
+
+        if (!data.slots || data.slots.length === 0) {
+          slotsContainer.textContent =
+            "No appointments have been added yet.";
+          return;
+        }
+
+        for (const slot of data.slots) {
+          const card = document.createElement("div");
+          card.className = "slot";
+
+          if (!slot.available) {
+            card.classList.add("unavailable");
+          }
+
+          const provider = document.createElement("strong");
+          provider.textContent = slot.provider;
+
+          const time = document.createElement("small");
+          time.textContent =
+            formatDate(slot.start) +
+            (slot.available ? " · Available" : " · Unavailable");
+
+          card.append(provider, time);
+
+          if (slot.available) {
+            card.tabIndex = 0;
+            card.setAttribute("role", "button");
+
+            const selectSlot = () => {
+              document.querySelectorAll(".slot")
+                .forEach(item => item.classList.remove("selected"));
+
+              card.classList.add("selected");
+              selectedSlot = slot;
+              selectedSlotInput.value =
+                slot.provider + " — " + formatDate(slot.start);
+            };
+
+            card.addEventListener("click", selectSlot);
+            card.addEventListener("keydown", event => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                selectSlot();
+              }
+            });
+          }
+
+          slotsContainer.appendChild(card);
+        }
+      } catch (error) {
+        slotsContainer.textContent = "";
+        showMessage(error.message, true);
+      } finally {
+        loadBtn.disabled = false;
+      }
+    }
+
+    loadBtn.addEventListener("click", loadSlots);
+
+    function updateBookButton() {
+      bookBtn.disabled = !selectedSlot ||
+        !document.getElementById("patientName").value.trim() ||
+        !document.getElementById("patientEmail").value.trim();
+    }
+
+    document.getElementById("patientName")
+      .addEventListener("input", updateBookButton);
+    document.getElementById("patientEmail")
+      .addEventListener("input", updateBookButton);
+    updateBookButton();
+
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+
+      if (!selectedSlot) {
+        showMessage("Please select an appointment.", true);
+        return;
+      }
+
+      bookBtn.disabled = true;
+
+      try {
+        const booking = await apiRequest("/web/bookings", {
+          method: "POST",
+          headers: {
+            "Idempotency-Key": crypto.randomUUID()
+          },
+          body: JSON.stringify({
+            slot_id: selectedSlot.id,
+            name: document.getElementById("patientName").value,
+            email: document.getElementById("patientEmail").value
+          })
+        });
+
+        showMessage(
+          "Booking confirmed for " +
+          booking.name + ". Your booking ID is " + booking.id
+        );
+
+        form.reset();
+        selectedSlot = null;
+        updateBookButton();
+        await loadSlots();
+      } catch (error) {
+        showMessage(error.message, true);
+      } finally {
+        bookBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
