@@ -221,9 +221,13 @@ def list_slots(
 
     for slot in slots:
         existing = db.scalar(
-            select(Booking.id).where(
-                Booking.slot_id == slot.id,
-                Booking.status == "confirmed"
+            select(Booking.id)
+            .join(Slot, Booking.slot_id == Slot.id)
+            .where(
+                Booking.status == "confirmed",
+                Slot.provider == slot.provider,
+                Slot.start < slot.end,
+                Slot.end > slot.start
             )
         )
 
@@ -431,6 +435,31 @@ async def create_booking(
         return finish(
             409,
             {"error": "slot already booked"}
+        )
+
+    # Serialize bookings for this provider, then reject any overlapping
+    # confirmed appointment—even when the appointments have different slot IDs.
+    db.execute(
+        select(Slot.id)
+        .where(Slot.provider == slot.provider)
+        .with_for_update()
+    ).all()
+
+    provider_conflict = db.scalar(
+        select(Booking.id)
+        .join(Slot, Booking.slot_id == Slot.id)
+        .where(
+            Booking.status == "confirmed",
+            Slot.provider == slot.provider,
+            Slot.start < slot.end,
+            Slot.end > slot.start
+        )
+    )
+
+    if provider_conflict is not None:
+        return finish(
+            409,
+            {"error": "provider is unavailable during this time"}
         )
 
     booking = Booking(
