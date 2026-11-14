@@ -146,6 +146,20 @@
       line-height: 1.5;
     }
 
+    .manage {
+      margin-top: 24px;
+      border-top: 1px solid var(--border);
+      padding-top: 24px;
+    }
+
+    button.secondary {
+      background: white;
+      color: var(--primary);
+      border: 1px solid #a8cbc7;
+    }
+
+    button.secondary:hover { background: #effaf8; }
+
     .hidden { display: none; }
 
     @media (max-width: 750px) {
@@ -215,6 +229,37 @@
         </form>
 
         <div id="message" class="status hidden" role="status"></div>
+
+        <section class="manage" aria-labelledby="manageHeading">
+          <h2 id="manageHeading">Manage your appointment</h2>
+          <p class="hint">
+            Need to cancel? Enter the booking ID from your confirmation and
+            the email used for the booking.
+          </p>
+
+          <form id="cancelForm">
+            <label for="bookingId">Booking ID</label>
+            <input
+              id="bookingId"
+              placeholder="e.g. 123e4567-e89b-12d3-a456-426614174000"
+              required
+            >
+
+            <label for="bookingEmail">Booking email</label>
+            <input
+              id="bookingEmail"
+              type="email"
+              placeholder="you@example.com"
+              required
+            >
+
+            <button id="cancelBtn" class="secondary" type="submit" disabled>
+              Cancel appointment
+            </button>
+          </form>
+
+          <div id="cancelMessage" class="status hidden" role="status"></div>
+        </section>
       </section>
     </div>
   </main>
@@ -226,12 +271,24 @@
     const message = document.getElementById("message");
     const loadBtn = document.getElementById("loadBtn");
     const bookBtn = document.getElementById("bookBtn");
+    const cancelForm = document.getElementById("cancelForm");
+    const bookingIdInput = document.getElementById("bookingId");
+    const bookingEmailInput = document.getElementById("bookingEmail");
+    const cancelBtn = document.getElementById("cancelBtn");
+    const cancelMessage = document.getElementById("cancelMessage");
 
     let selectedSlot = null;
 
     function showMessage(text, isError = false) {
       message.textContent = text;
       message.className = isError
+        ? "status error"
+        : "status";
+    }
+
+    function showCancelMessage(text, isError = false) {
+      cancelMessage.textContent = text;
+      cancelMessage.className = isError
         ? "status error"
         : "status";
     }
@@ -344,6 +401,14 @@
       .addEventListener("input", updateBookButton);
     updateBookButton();
 
+    function updateCancelButton() {
+      cancelBtn.disabled = !bookingIdInput.value.trim() ||
+        !bookingEmailInput.value.trim();
+    }
+
+    bookingIdInput.addEventListener("input", updateCancelButton);
+    bookingEmailInput.addEventListener("input", updateCancelButton);
+
     form.addEventListener("submit", async event => {
       event.preventDefault();
 
@@ -374,12 +439,49 @@
 
         form.reset();
         selectedSlot = null;
+        bookingIdInput.value = booking.id;
+        bookingEmailInput.value = booking.email;
+        updateCancelButton();
         updateBookButton();
         await loadSlots();
       } catch (error) {
         showMessage(error.message, true);
       } finally {
         bookBtn.disabled = false;
+      }
+    });
+
+    cancelForm.addEventListener("submit", async event => {
+      event.preventDefault();
+
+      if (!window.confirm("Cancel this appointment?")) {
+        return;
+      }
+
+      cancelBtn.disabled = true;
+
+      try {
+        const cancelled = await apiRequest(
+          "/web/bookings/" +
+          encodeURIComponent(bookingIdInput.value.trim()) +
+          "/cancel",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              email: bookingEmailInput.value
+            })
+          }
+        );
+
+        showCancelMessage(
+          "Appointment cancelled. Booking " + cancelled.id +
+          " is no longer confirmed."
+        );
+        await loadSlots();
+      } catch (error) {
+        showCancelMessage(error.message, true);
+      } finally {
+        updateCancelButton();
       }
     });
   </script>

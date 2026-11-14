@@ -115,6 +115,21 @@ class BookingInput(BaseModel):
         return value.lower()
 
 
+class CancellationInput(BaseModel):
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value):
+        value = value.strip().lower()
+        if not re.fullmatch(
+            r"[^@\s]+@[^@\s]+\.[^@\s]+",
+            value
+        ):
+            raise ValueError("Invalid email address")
+        return value
+
+
 # --------------------------------------------------
 # Helper functions
 # --------------------------------------------------
@@ -603,6 +618,25 @@ async def web_create_booking(
     db: Session = Depends(get_db)
 ):
     return await create_booking(request=request, db=db)
+
+
+@app.post("/web/bookings/{booking_id}/cancel", include_in_schema=False)
+def web_cancel_booking(
+    booking_id: str,
+    data: CancellationInput,
+    db: Session = Depends(get_db)
+):
+    booking = db.get(Booking, booking_id)
+
+    # Require both booking ID and matching email for the public patient flow.
+    # Return a generic 404 so the route does not reveal whether an ID exists.
+    if booking is None or booking.email.lower() != data.email:
+        raise HTTPException(
+            status_code=404,
+            detail="booking not found"
+        )
+
+    return cancel_booking(booking_id=booking_id, db=db)
 
 app.mount(
     "/",
