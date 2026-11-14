@@ -294,9 +294,10 @@ async def create_booking(
             headers=headers
         )
 
-    # SQLite: acquire a write lock before checking
-    # availability, rate limits, or idempotency.
-    db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+    # SQLite needs an immediate write transaction for the booking checks.
+    # PostgreSQL uses its normal transaction handling and row locks below.
+    if db.get_bind().dialect.name == "sqlite":
+        db.connection().exec_driver_sql("BEGIN IMMEDIATE")
 
     # Idempotency lookup
     if key is not None:

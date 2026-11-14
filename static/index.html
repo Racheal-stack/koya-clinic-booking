@@ -38,7 +38,7 @@
     const slotsContainer=document.getElementById("slots"),loadBtn=document.getElementById("loadBtn"),message=document.getElementById("message"),modal=document.getElementById("bookingModal"),modalSlot=document.getElementById("modalSlot"),modalMessage=document.getElementById("modalMessage"),form=document.getElementById("bookingForm"),bookBtn=document.getElementById("bookBtn");
     let selectedSlot=null;
     function setStatus(el,text,error=false){el.textContent=text;el.className=error?"status error":"status"}
-    async function apiRequest(path,options={}){const response=await fetch(path,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});const data=await response.json();if(!response.ok)throw new Error(data.error||"Request failed. Please try again.");return data}
+    async function apiRequest(path,options={}){const response=await fetch(path,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});const text=await response.text();let data={};try{data=JSON.parse(text)}catch{if(!response.ok)throw new Error("The server could not complete the request.");throw new Error("Unexpected server response.")}if(!response.ok)throw new Error(data.error||"Request failed. Please try again.");return data}
     function day(v){return new Date(v).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric",year:"numeric"})}
     function time(v){return new Date(v).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"})}
     function closeMenus(){document.querySelectorAll(".action-menu").forEach(menu=>menu.hidden=true)}
