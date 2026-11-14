@@ -104,27 +104,114 @@
     button:hover { background: #056b63; }
     button:disabled { opacity: .5; cursor: not-allowed; }
 
-    .slot {
-      padding: 16px;
+    .table-wrap {
+      margin-top: 20px;
+      overflow-x: auto;
       border: 1px solid var(--border);
-      border-radius: 11px;
-      margin: 12px 0;
-      cursor: pointer;
+      border-radius: 12px;
     }
 
-    .slot.selected {
-      border: 2px solid var(--primary);
-      background: #effaf8;
+    .appointments-table {
+      width: 100%;
+      min-width: 560px;
+      border-collapse: collapse;
+      text-align: left;
     }
 
-    .slot.unavailable {
-      opacity: .55;
-      cursor: not-allowed;
+    .appointments-table th {
+      padding: 13px 16px;
+      background: #f7fbfa;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: .04em;
+      text-transform: uppercase;
     }
 
-    .slot strong { display: block; margin-bottom: 6px; }
+    .appointments-table td {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      color: var(--dark);
+      vertical-align: middle;
+    }
 
-    .slot small { color: var(--muted); }
+    .appointments-table tr.selected { background: #effaf8; }
+    .appointments-table tr.unavailable { color: #9aabad; }
+    .appointments-table tr.unavailable td { color: #9aabad; }
+
+    .appointment-date { font-weight: 700; }
+    .appointment-time { color: var(--muted); font-size: 13px; }
+
+    .availability {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .availability::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #2f9c89;
+    }
+
+    .availability.unavailable::before { background: #aebbbc; }
+
+    .availability.your-booking {
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .availability.your-booking::before { background: var(--primary); }
+
+    .action-wrap { position: relative; text-align: right; }
+
+    .action-button {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      margin: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: white;
+      color: var(--dark);
+      font-size: 22px;
+      line-height: 1;
+      letter-spacing: 2px;
+    }
+
+    .action-button:hover { background: #effaf8; color: var(--primary); }
+
+    .action-menu {
+      position: absolute;
+      z-index: 2;
+      top: 42px;
+      right: 0;
+      min-width: 170px;
+      padding: 6px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: white;
+      box-shadow: 0 12px 30px rgba(20,60,66,.15);
+    }
+
+    .action-menu[hidden] { display: none; }
+
+    .menu-item {
+      width: 100%;
+      padding: 10px 12px;
+      margin: 0;
+      border-radius: 6px;
+      background: white;
+      color: var(--dark);
+      text-align: left;
+      font-size: 13px;
+    }
+
+    .menu-item:hover { background: #effaf8; color: var(--primary); }
 
     .status {
       margin-top: 15px;
@@ -307,6 +394,7 @@
     const cancelMessage = document.getElementById("cancelMessage");
 
     let selectedSlot = null;
+    let currentBooking = null;
 
     function showMessage(text, isError = false) {
       message.textContent = text;
@@ -349,6 +437,22 @@
       });
     }
 
+    function formatDay(date) {
+      return new Date(date).toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+      });
+    }
+
+    function formatTime(date) {
+      return new Date(date).toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit"
+      });
+    }
+
     async function loadSlots() {
       loadBtn.disabled = true;
       slotsContainer.textContent = "Loading appointments...";
@@ -365,49 +469,116 @@
           return;
         }
 
+        const tableWrap = document.createElement("div");
+        tableWrap.className = "table-wrap";
+
+        const table = document.createElement("table");
+        table.className = "appointments-table";
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Provider</th>
+              <th>Status</th>
+              <th><span class="hidden">Actions</span></th>
+            </tr>
+          </thead>
+        `;
+
+        const body = document.createElement("tbody");
+
         for (const slot of data.slots) {
-          const card = document.createElement("div");
-          card.className = "slot";
+          const isMyBooking = currentBooking &&
+            currentBooking.slot_id === slot.id &&
+            currentBooking.status === "confirmed";
+          const row = document.createElement("tr");
+          if (!slot.available && !isMyBooking) row.className = "unavailable";
 
-          if (!slot.available) {
-            card.classList.add("unavailable");
-          }
+          const dateCell = document.createElement("td");
+          dateCell.className = "appointment-date";
+          dateCell.textContent = formatDay(slot.start);
 
-          const provider = document.createElement("strong");
-          provider.textContent = slot.provider;
+          const timeCell = document.createElement("td");
+          timeCell.className = "appointment-time";
+          timeCell.textContent = formatTime(slot.start);
 
-          const time = document.createElement("small");
-          time.textContent =
-            formatDate(slot.start) +
-            (slot.available ? " · Available" : " · Unavailable");
+          const providerCell = document.createElement("td");
+          providerCell.textContent = slot.provider;
 
-          card.append(provider, time);
+          const statusCell = document.createElement("td");
+          const status = document.createElement("span");
+          status.className = "availability" +
+            (isMyBooking ? " your-booking" :
+              (slot.available ? "" : " unavailable"));
+          status.textContent = isMyBooking ? "Your booking" :
+            (slot.available ? "Available" : "Unavailable");
+          statusCell.appendChild(status);
 
-          if (slot.available) {
-            card.tabIndex = 0;
-            card.setAttribute("role", "button");
+          const actionCell = document.createElement("td");
+          actionCell.className = "action-wrap";
 
-            const selectSlot = () => {
-              document.querySelectorAll(".slot")
-                .forEach(item => item.classList.remove("selected"));
+          if (slot.available || isMyBooking) {
+            const actionButton = document.createElement("button");
+            actionButton.type = "button";
+            actionButton.className = "action-button";
+            actionButton.setAttribute("aria-label", "Appointment actions");
+            actionButton.setAttribute("aria-expanded", "false");
+            actionButton.textContent = "⋯";
 
-              card.classList.add("selected");
-              selectedSlot = slot;
-              selectedSlotInput.value =
-                slot.provider + " — " + formatDate(slot.start);
-            };
+            const menu = document.createElement("div");
+            menu.className = "action-menu";
+            menu.hidden = true;
 
-            card.addEventListener("click", selectSlot);
-            card.addEventListener("keydown", event => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                selectSlot();
-              }
+            const action = document.createElement("button");
+            action.type = "button";
+            action.className = "menu-item";
+
+            if (slot.available) {
+              action.textContent = "Book this appointment";
+              action.addEventListener("click", () => {
+                document.querySelectorAll(".action-menu")
+                  .forEach(item => item.hidden = true);
+                document.querySelectorAll(".appointments-table tr")
+                  .forEach(item => item.classList.remove("selected"));
+                row.classList.add("selected");
+                selectedSlot = slot;
+                selectedSlotInput.value =
+                  slot.provider + " — " + formatDate(slot.start);
+                updateBookButton();
+                document.getElementById("patientName").focus();
+              });
+            } else {
+              action.textContent = "Cancel appointment";
+              action.addEventListener("click", async () => {
+                menu.hidden = true;
+                await cancelBookingFromWeb(
+                  currentBooking.id,
+                  currentBooking.email
+                );
+              });
+            }
+
+            actionButton.addEventListener("click", () => {
+              document.querySelectorAll(".action-menu")
+                .forEach(item => item.hidden = true);
+              menu.hidden = false;
+              actionButton.setAttribute("aria-expanded", "true");
             });
+
+            menu.appendChild(action);
+            actionCell.append(actionButton, menu);
+          } else {
+            actionCell.textContent = "—";
           }
 
-          slotsContainer.appendChild(card);
+          row.append(dateCell, timeCell, providerCell, statusCell, actionCell);
+          body.appendChild(row);
         }
+
+        table.appendChild(body);
+        tableWrap.appendChild(table);
+        slotsContainer.appendChild(tableWrap);
       } catch (error) {
         slotsContainer.textContent = "";
         showMessage(error.message, true);
@@ -437,6 +608,40 @@
 
     bookingIdInput.addEventListener("input", updateCancelButton);
     bookingEmailInput.addEventListener("input", updateCancelButton);
+
+    async function cancelBookingFromWeb(bookingId, email) {
+      if (!window.confirm("Cancel this appointment?")) {
+        return false;
+      }
+
+      try {
+        const cancelled = await apiRequest(
+          "/web/bookings/" +
+          encodeURIComponent(bookingId) +
+          "/cancel",
+          {
+            method: "POST",
+            body: JSON.stringify({ email })
+          }
+        );
+
+        currentBooking = null;
+        bookingIdInput.value = "";
+        bookingEmailInput.value = "";
+        updateCancelButton();
+        document.querySelector(".manage").open = true;
+        showCancelMessage(
+          "Appointment cancelled. Booking " + cancelled.id +
+          " is no longer confirmed."
+        );
+        await loadSlots();
+        return true;
+      } catch (error) {
+        document.querySelector(".manage").open = true;
+        showCancelMessage(error.message, true);
+        return false;
+      }
+    }
 
     form.addEventListener("submit", async event => {
       event.preventDefault();
@@ -468,6 +673,7 @@
 
         form.reset();
         selectedSlot = null;
+        currentBooking = booking;
         bookingIdInput.value = booking.id;
         bookingEmailInput.value = booking.email;
         updateCancelButton();
@@ -483,35 +689,12 @@
     cancelForm.addEventListener("submit", async event => {
       event.preventDefault();
 
-      if (!window.confirm("Cancel this appointment?")) {
-        return;
-      }
-
       cancelBtn.disabled = true;
-
-      try {
-        const cancelled = await apiRequest(
-          "/web/bookings/" +
-          encodeURIComponent(bookingIdInput.value.trim()) +
-          "/cancel",
-          {
-            method: "POST",
-            body: JSON.stringify({
-              email: bookingEmailInput.value
-            })
-          }
-        );
-
-        showCancelMessage(
-          "Appointment cancelled. Booking " + cancelled.id +
-          " is no longer confirmed."
-        );
-        await loadSlots();
-      } catch (error) {
-        showCancelMessage(error.message, true);
-      } finally {
-        updateCancelButton();
-      }
+      await cancelBookingFromWeb(
+        bookingIdInput.value.trim(),
+        bookingEmailInput.value
+      );
+      updateCancelButton();
     });
   </script>
 </body>
