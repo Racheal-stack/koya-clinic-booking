@@ -149,7 +149,34 @@
     .manage {
       margin-top: 24px;
       border-top: 1px solid var(--border);
-      padding-top: 24px;
+      padding-top: 0;
+      overflow: hidden;
+    }
+
+    .manage summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 20px 0 4px;
+      color: var(--dark);
+      font-size: 16px;
+      font-weight: 750;
+    }
+
+    .manage summary::-webkit-details-marker { display: none; }
+
+    .manage summary::after {
+      content: "+";
+      float: right;
+      color: var(--primary);
+      font-size: 24px;
+      font-weight: 400;
+      line-height: 16px;
+    }
+
+    .manage[open] summary::after { content: "−"; }
+
+    .manage-content {
+      padding-top: 10px;
     }
 
     button.secondary {
@@ -230,36 +257,38 @@
 
         <div id="message" class="status hidden" role="status"></div>
 
-        <section class="manage" aria-labelledby="manageHeading">
-          <h2 id="manageHeading">Manage your appointment</h2>
-          <p class="hint">
-            Need to cancel? Enter the booking ID from your confirmation and
-            the email used for the booking.
-          </p>
+        <details class="manage">
+          <summary>Need to cancel an appointment?</summary>
+          <div class="manage-content">
+            <p class="hint">
+              Enter the booking ID from your confirmation and the email used
+              for the booking.
+            </p>
 
-          <form id="cancelForm">
-            <label for="bookingId">Booking ID</label>
-            <input
-              id="bookingId"
-              placeholder="e.g. 123e4567-e89b-12d3-a456-426614174000"
-              required
-            >
+            <form id="cancelForm">
+              <label for="bookingId">Booking ID</label>
+              <input
+                id="bookingId"
+                placeholder="e.g. 123e4567-e89b-12d3-a456-426614174000"
+                required
+              >
 
-            <label for="bookingEmail">Booking email</label>
-            <input
-              id="bookingEmail"
-              type="email"
-              placeholder="you@example.com"
-              required
-            >
+              <label for="bookingEmail">Booking email</label>
+              <input
+                id="bookingEmail"
+                type="email"
+                placeholder="you@example.com"
+                required
+              >
 
-            <button id="cancelBtn" class="secondary" type="submit" disabled>
-              Cancel appointment
-            </button>
-          </form>
+              <button id="cancelBtn" class="secondary" type="submit" disabled>
+                Cancel appointment
+              </button>
+            </form>
 
-          <div id="cancelMessage" class="status hidden" role="status"></div>
-        </section>
+            <div id="cancelMessage" class="status hidden" role="status"></div>
+          </div>
+        </details>
       </section>
     </div>
   </main>
